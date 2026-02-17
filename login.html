@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SOP Portal - Login</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<div class="container" style="max-width:520px;padding-top:60px;">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div>
+        <div style="font-size:20px;font-weight:800;">Sign in</div>
+        <div class="small">Use your company email.</div>
+      </div>
+    </div>
+    <div class="hr"></div>
+    <div class="kv">
+      <div class="small">Email</div>
+      <input id="email" class="input" placeholder="you@company.com" autocomplete="email"/>
+      <div class="small">Password</div>
+      <input id="password" class="input" type="password" placeholder="Password" autocomplete="current-password"/>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button id="btnLogin" class="btn primary">Sign in</button>
+      <button id="btnSignup" class="btn">Create account</button>
+      <div class="grow"></div>
+    </div>
+    <div id="msg" style="margin-top:12px;"></div>
+    <div class="small" style="margin-top:12px;">
+      Note: Accounts are managed by Supabase Auth. After sign up, add your email to the users table if you need admin rights.
+    </div>
+  </div>
+</div>
+
+<script src="./config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-client.js"></script>
+<script>
+function show(type, text){
+  const el = document.getElementById("msg");
+  el.className = type === "error" ? "error" : "notice";
+  el.textContent = text;
+}
+
+document.getElementById("btnLogin").onclick = async () => {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+  if (!email || !password) return show("error","Email and password are required.");
+  const { error } = await window.sb.auth.signInWithPassword({ email, password });
+  if (error) return show("error", error.message);
+  location.href = "departments.html";
+};
+
+document.getElementById("btnSignup").onclick = async () => {
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value;
+  if (!email || !password) return show("error","Email and password are required.");
+  const { error } = await window.sb.auth.signUp({ email, password });
+  if (error) return show("error", error.message);
+  show("ok","Account created. If email confirmation is enabled, confirm it, then sign in.");
+};
+</script>
+</body>
+</html>
