@@ -1,66 +1,169 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SOP Portal - Login</title>
-  <link rel="stylesheet" href="./style.css"/>
+  <script src="config.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Internal Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0D0D0D; --paper: #F7F4EF; --accent: #C8522A;
+      --muted: #6B6560; --border: #E0DAD3;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:'DM Sans',sans-serif;
+      background:linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:var(--ink);
+    }
+    .login-card {
+      background:#fff;
+      border-radius:16px;
+      padding:48px 56px;
+      width:100%;
+      max-width:440px;
+      box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    }
+    .logo {
+      font-family:'DM Serif Display',serif;
+      font-size:28px;
+      margin-bottom:8px;
+      text-align:center;
+    }
+    .tagline {
+      font-size:14px;
+      color:var(--muted);
+      text-align:center;
+      margin-bottom:40px;
+    }
+    .form-group {
+      margin-bottom:20px;
+    }
+    .form-group label {
+      display:block;
+      font-size:12px;
+      font-weight:600;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:8px;
+    }
+    .form-group input {
+      width:100%;
+      padding:14px 16px;
+      border:1.5px solid var(--border);
+      border-radius:10px;
+      font-family:'DM Sans',sans-serif;
+      font-size:15px;
+      outline:none;
+      transition:border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color:var(--accent);
+    }
+    .btn-login {
+      width:100%;
+      padding:14px;
+      background:var(--accent);
+      color:#fff;
+      border:none;
+      border-radius:10px;
+      font-family:'DM Sans',sans-serif;
+      font-size:15px;
+      font-weight:600;
+      cursor:pointer;
+      transition:background 0.2s;
+      margin-top:8px;
+    }
+    .btn-login:hover {
+      background:#b34520;
+    }
+    .btn-login:disabled {
+      background:#ccc;
+      cursor:not-allowed;
+    }
+    .error {
+      background:#fee2e2;
+      color:#dc2626;
+      padding:12px 16px;
+      border-radius:8px;
+      font-size:13.5px;
+      margin-bottom:20px;
+      display:none;
+    }
+    .error.show {
+      display:block;
+    }
+  </style>
 </head>
 <body>
-<div class="container" style="max-width:520px;padding-top:60px;">
-  <div class="card">
-    <div class="row" style="justify-content:space-between;">
-      <div>
-        <div style="font-size:20px;font-weight:800;">Sign in</div>
-        <div class="small">Use your company email.</div>
-      </div>
+
+<div class="login-card">
+  <div class="logo">[Company Name]</div>
+  <div class="tagline">Internal Portal</div>
+
+  <div class="error" id="error"></div>
+
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="email" required autocomplete="email">
     </div>
-    <div class="hr"></div>
-    <div class="kv">
-      <div class="small">Email</div>
-      <input id="email" class="input" placeholder="you@company.com" autocomplete="email"/>
-      <div class="small">Password</div>
-      <input id="password" class="input" type="password" placeholder="Password" autocomplete="current-password"/>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="password" required autocomplete="current-password">
     </div>
-    <div class="row" style="margin-top:14px;">
-      <button id="btnLogin" class="btn primary">Sign in</button>
-      <button id="btnSignup" class="btn">Create account</button>
-      <div class="grow"></div>
-    </div>
-    <div id="msg" style="margin-top:12px;"></div>
-    <div class="small" style="margin-top:12px;">
-      Note: Accounts are managed by Supabase Auth. After sign up, add your email to the users table if you need admin rights.
-    </div>
-  </div>
+    <button type="submit" class="btn-login" id="btnLogin">Sign In</button>
+  </form>
 </div>
 
-<script src="./config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./supabase-client.js"></script>
 <script>
-function show(type, text){
-  const el = document.getElementById("msg");
-  el.className = type === "error" ? "error" : "notice";
-  el.textContent = text;
-}
+  const SUPABASE_URL = 'https://wkwgyoowhfhkyqwlufup.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indrd2d5b293aGZoa3lxd2x1ZnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDQwMTIsImV4cCI6MjA4NjkyMDAxMn0.ArSqtBC9K_268UnAfwTiqgYoJXGoXDmp1n9J2ISzgLE';
 
-document.getElementById("btnLogin").onclick = async () => {
-  const email = document.getElementById("email").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
-  if (!email || !password) return show("error","Email and password are required.");
-  const { error } = await window.sb.auth.signInWithPassword({ email, password });
-  if (error) return show("error", error.message);
-  location.href = "departments.html";
-};
+  const { createClient } = supabase;
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-document.getElementById("btnSignup").onclick = async () => {
-  const email = document.getElementById("email").value.trim().toLowerCase();
-  const password = document.getElementById("password").value;
-  if (!email || !password) return show("error","Email and password are required.");
-  const { error } = await window.sb.auth.signUp({ email, password });
-  if (error) return show("error", error.message);
-  show("ok","Account created. If email confirmation is enabled, confirm it, then sign in.");
-};
+  // Check if already logged in
+  (async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      window.location.href = 'company-overview.html';
+    }
+  })();
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('btnLogin');
+    const errorEl = document.getElementById('error');
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+    errorEl.classList.remove('show');
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      errorEl.textContent = error.message;
+      errorEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    } else {
+      window.location.href = 'company-overview.html';
+    }
+  }
 </script>
 </body>
 </html>
