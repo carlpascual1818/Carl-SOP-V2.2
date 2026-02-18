@@ -1,19 +1,198 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SOP Portal</title>
-  <link rel="stylesheet" href="./style.css"/>
+  <script src="config.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Role SOP — Internal Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0D0D0D; --paper: #F7F4EF; --accent: #C8522A;
+      --muted: #6B6560; --border: #E0DAD3; --tag-bg: #EDE8E2; --white: #fff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+    .layout { display:flex; min-height:100vh; }
+
+    .sidebar { width:260px; min-width:260px; background:var(--ink); color:#fff; padding:40px 28px; display:flex; flex-direction:column; gap:24px; position:sticky; top:0; height:100vh; overflow-y:auto; }
+    .sidebar-logo { font-family:'DM Serif Display',serif; font-size:22px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:20px; cursor:pointer; }
+    .sidebar-logo span { display:block; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.35); margin-bottom:6px; }
+    .back-link { display:block; padding:8px 12px; border-radius:6px; font-size:13px; color:rgba(255,255,255,0.5); text-decoration:none; border:1px solid rgba(255,255,255,0.1); text-align:center; margin-bottom:20px; }
+    .back-link:hover { color:rgba(255,255,255,0.8); border-color:rgba(255,255,255,0.3); }
+    .sidebar-nav h4 { font-size:10px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.3); margin-bottom:10px; }
+    .sidebar-nav ul { list-style:none; display:flex; flex-direction:column; gap:2px; }
+    .sidebar-nav ul li a { display:block; padding:8px 12px; border-radius:6px; font-size:13.5px; color:rgba(255,255,255,0.6); text-decoration:none; transition:all 0.15s; cursor:pointer; }
+    .sidebar-nav ul li a:hover { background:rgba(255,255,255,0.07); color:#fff; }
+    .sidebar-nav ul li a.active { background:var(--accent); color:#fff; }
+
+    .main { flex:1; padding:64px 72px; max-width:860px; }
+    .doc-eyebrow { font-size:11px; font-weight:600; letter-spacing:2.5px; text-transform:uppercase; color:var(--accent); margin-bottom:16px; }
+    .doc-title { font-family:'DM Serif Display',serif; font-size:52px; line-height:1.05; letter-spacing:-1px; margin-bottom:12px; }
+    .doc-subtitle { font-size:17px; color:var(--muted); line-height:1.6; margin-bottom:36px; }
+
+    .section { margin-bottom:56px; }
+    .section-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+    .section-number { font-family:'DM Serif Display',serif; font-size:13px; color:var(--accent); min-width:24px; }
+    .section-title { font-family:'DM Serif Display',serif; font-size:26px; letter-spacing:-0.3px; }
+    .section-line { flex:1; height:1px; background:var(--border); }
+    .body-text { font-size:15px; line-height:1.75; color:#2A2A2A; margin-bottom:16px; }
+
+    .card { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:20px 24px; margin-bottom:12px; }
+    .card-title { font-size:15px; font-weight:600; margin-bottom:8px; }
+    .card-content { font-size:14px; color:var(--muted); line-height:1.6; }
+
+    .loading { display:flex; align-items:center; justify-content:center; min-height:100vh; font-size:15px; color:var(--muted); }
+
+    @media(max-width:900px){ .sidebar{display:none} .main{padding:40px 24px} }
+  </style>
 </head>
 <body>
-<div id="app"></div>
 
-<script src="./config.js"></script>
+<div class="loading" id="loading">Loading...</div>
+
+<div class="layout" id="app" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-logo" onclick="goBack()"><span>Internal Portal</span>[Company Name]</div>
+    <a class="back-link" href="company-overview.html">← Back to Portal</a>
+    <nav class="sidebar-nav" id="roleNav"></nav>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./supabase-client.js"></script>
-<script src="./app-shell.js"></script>
-<script src="./utils.js"></script>
-<script src="./role.js"></script>
+<script>
+  const SUPABASE_URL = 'https://wkwgyoowhfhkyqwlufup.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indrd2d5b293aGZoa3lxd2x1ZnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDQwMTIsImV4cCI6MjA4NjkyMDAxMn0.ArSqtBC9K_268UnAfwTiqgYoJXGoXDmp1n9J2ISzgLE';
+
+  const { createClient } = supabase;
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentUser = null;
+  let currentRole = null;
+
+  const ROLES_HIERARCHY = {
+    'CEO': ['CEO','COO','CFO','Operations Manager','CS Manager','Product Manager','Creative Manager','FB Ads Manager','Media Buyer','HR','Tech / Automations','CS','Dispute Specialist','Funnel Builder','Video Editor','VA'],
+    'COO': ['COO','CFO','Operations Manager','CS Manager','Product Manager','Creative Manager','FB Ads Manager','Media Buyer','HR','Tech / Automations','CS','Dispute Specialist','Funnel Builder','Video Editor','VA'],
+    'CFO': ['CFO','VA'],
+    'Operations Manager': ['Operations Manager','CS Manager','Product Manager','Creative Manager','FB Ads Manager','Media Buyer','HR','Tech / Automations','CS','Dispute Specialist','Funnel Builder','Video Editor','VA'],
+    'CS Manager': ['CS Manager','CS','Dispute Specialist'],
+    'Product Manager': ['Product Manager','Funnel Builder'],
+    'Creative Manager': ['Creative Manager','Video Editor'],
+  };
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const { data: users } = await supabaseClient.from('users').select('*').eq('email', session.user.email).single();
+    currentUser = users || { name: session.user.email, role: 'Employee', email: session.user.email };
+
+    const params = new URLSearchParams(window.location.search);
+    currentRole = params.get('role');
+
+    if (!currentRole) {
+      alert('No role specified');
+      window.location.href = 'company-overview.html';
+      return;
+    }
+
+    // Check hierarchy-based permissions
+    let visibleRoles = ROLES_HIERARCHY[currentUser.role] || [currentUser.role];
+    
+    // Check manual permission overrides
+    const { data: manualPerms } = await supabaseClient
+      .from('role_permissions')
+      .select('role')
+      .eq('user_email', currentUser.email)
+      .eq('can_edit', true);
+    
+    if (manualPerms && manualPerms.length > 0) {
+      const manualRoles = manualPerms.map(p => p.role);
+      visibleRoles = [...new Set([...visibleRoles, ...manualRoles])]; // Merge and dedupe
+    }
+
+    if (!visibleRoles.includes(currentRole)) {
+      alert('Access denied to this role');
+      window.location.href = 'company-overview.html';
+      return;
+    }
+
+    renderSidebar(visibleRoles);
+    await loadRoleContent();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  }
+
+  function renderSidebar(visibleRoles) {
+    const roleLinks = visibleRoles.map(r => {
+      const active = r === currentRole ? 'active' : '';
+      return `<li><a href="role.html?role=${encodeURIComponent(r)}" class="${active}">${r}</a></li>`;
+    }).join('');
+
+    document.getElementById('roleNav').innerHTML = `
+      <h4>Roles You Can View</h4>
+      <ul>${roleLinks}</ul>
+    `;
+  }
+
+  async function loadRoleContent() {
+    const { data: roleData } = await supabaseClient
+      .from('sop_roles')
+      .select('*')
+      .eq('role', currentRole)
+      .single();
+
+    if (!roleData) {
+      document.getElementById('main').innerHTML = `
+        <div class="doc-eyebrow">${currentRole}</div>
+        <h1 class="doc-title">No content yet</h1>
+        <p class="doc-subtitle">This role's SOP content hasn't been created yet. Ask your admin to add it.</p>
+      `;
+      return;
+    }
+
+    const responsibilities = roleData.responsibilities || [];
+    const sops = roleData.sops || [];
+    const kpis = roleData.kpis || [];
+    const tools = roleData.tools || [];
+
+    document.getElementById('main').innerHTML = `
+      <div class="doc-eyebrow">${currentRole}</div>
+      <h1 class="doc-title">${currentRole} SOP</h1>
+      <p class="doc-subtitle">${roleData.role_overview || 'Role overview not yet defined.'}</p>
+
+      <div class="section">
+        <div class="section-header"><span class="section-number">01</span><h2 class="section-title">Responsibilities</h2><div class="section-line"></div></div>
+        ${responsibilities.length > 0 ? responsibilities.map(r => `<div class="card"><div class="card-content">${r}</div></div>`).join('') : '<p class="body-text">No responsibilities defined yet.</p>'}
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-number">02</span><h2 class="section-title">SOPs</h2><div class="section-line"></div></div>
+        ${sops.length > 0 ? sops.map(s => `<div class="card"><div class="card-title">${s.title}</div><div class="card-content">${s.content}</div></div>`).join('') : '<p class="body-text">No SOPs defined yet.</p>'}
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-number">03</span><h2 class="section-title">KPIs</h2><div class="section-line"></div></div>
+        ${kpis.length > 0 ? kpis.map(k => `<div class="card"><div class="card-title">${k.metric}</div><div class="card-content">Target: ${k.target}</div></div>`).join('') : '<p class="body-text">No KPIs defined yet.</p>'}
+      </div>
+
+      <div class="section">
+        <div class="section-header"><span class="section-number">04</span><h2 class="section-title">Tools</h2><div class="section-line"></div></div>
+        ${tools.length > 0 ? tools.map(t => `<div class="card"><div class="card-title">${t.name}</div><div class="card-content">${t.purpose}</div></div>`).join('') : '<p class="body-text">No tools defined yet.</p>'}
+      </div>
+    `;
+  }
+
+  function goBack() {
+    window.location.href = 'company-overview.html';
+  }
+
+  init();
+</script>
 </body>
 </html>
