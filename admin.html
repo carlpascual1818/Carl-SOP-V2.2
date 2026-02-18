@@ -1,19 +1,477 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SOP Portal</title>
-  <link rel="stylesheet" href="./style.css"/>
+  <script src="config.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — SOP Editor</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink:#0D0D0D; --paper:#F7F4EF; --accent:#C8522A; --accent-light:#fdf0ec;
+      --green:#16a34a; --muted:#6B6560; --border:#E0DAD3; --tag-bg:#EDE8E2; --white:#fff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+
+    .admin-layout { display:flex; min-height:100vh; }
+    .admin-sidebar { width:240px; min-width:240px; background:var(--ink); padding:32px 24px; position:sticky; top:0; height:100vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+    .admin-sidebar .logo { font-family:'DM Serif Display',serif; font-size:18px; color:#fff; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.1); }
+    .admin-sidebar .logo span { display:block; font-family:'DM Sans',sans-serif; font-size:10px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.35); margin-bottom:5px; }
+    .nav-item { padding:9px 12px; border-radius:6px; font-size:13px; color:rgba(255,255,255,0.55); cursor:pointer; transition:all 0.15s; }
+    .nav-item:hover { background:rgba(255,255,255,0.07); color:#fff; }
+    .nav-item.active { background:var(--accent); color:#fff; }
+    .sidebar-actions { margin-top:auto; display:flex; flex-direction:column; gap:8px; }
+    .btn-preview { display:block; text-align:center; padding:10px; border-radius:8px; font-size:13px; color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.15); text-decoration:none; transition:all 0.15s; }
+    .btn-preview:hover { color:#fff; border-color:rgba(255,255,255,0.4); }
+    .btn-save-all { padding:12px; border-radius:8px; background:var(--accent); color:#fff; border:none; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:background 0.2s; }
+    .btn-save-all:hover { background:#b34520; }
+    .btn-save-all:disabled { background:#ccc; cursor:not-allowed; }
+
+    .admin-main { flex:1; padding:48px 56px; max-width:820px; }
+    .page-header { margin-bottom:40px; }
+    .page-header h1 { font-family:'DM Serif Display',serif; font-size:36px; margin-bottom:6px; }
+    .page-header p { font-size:14px; color:var(--muted); }
+
+    .editor-section { display:none; }
+    .editor-section.active { display:block; }
+    .section-heading { font-family:'DM Serif Display',serif; font-size:22px; margin-bottom:6px; }
+    .section-sub { font-size:13.5px; color:var(--muted); margin-bottom:28px; }
+
+    .field { margin-bottom:20px; }
+    .field label { display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
+    .field input, .field textarea, .field select {
+      width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:8px;
+      font-family:'DM Sans',sans-serif; font-size:14px; background:var(--white); color:var(--ink);
+      transition:border-color 0.15s; outline:none; resize:vertical;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+    .field textarea { min-height:90px; }
+
+    .toast { position:fixed; bottom:28px; right:28px; background:var(--green); color:#fff; padding:14px 22px; border-radius:10px; font-size:14px; font-weight:500; transform:translateY(80px); opacity:0; transition:all 0.3s; z-index:999; }
+    .toast.show { transform:translateY(0); opacity:1; }
+
+    .card-field { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--white); outline:none; transition:border-color 0.15s; }
+    .card-field:focus { border-color:var(--accent); }
+    .card-field.textarea { resize:vertical; min-height:60px; }
+
+    .loading { display:flex; align-items:center; justify-content:center; min-height:100vh; font-size:15px; color:var(--muted); }
+
+    @media(max-width:900px){ .admin-sidebar{display:none} .admin-main{padding:32px 20px} }
+  </style>
 </head>
 <body>
-<div id="app"></div>
 
-<script src="./config.js"></script>
+<div class="loading" id="loading">Loading...</div>
+
+<div class="admin-layout" id="adminUI" style="display:none">
+  <aside class="admin-sidebar">
+    <div class="logo"><span>SOP Editor</span>Admin Panel</div>
+    <div class="nav-item active" onclick="showSection('company')">🏢 Company Overview</div>
+    <div class="nav-item" onclick="showSection('roles')">👥 Roles & SOPs</div>
+    <div class="nav-item" onclick="showSection('permissions')">🔐 Permissions</div>
+    <div class="sidebar-actions">
+      <a class="btn-preview" href="company-overview.html" target="_blank">👁 Preview Portal</a>
+      <button class="btn-save-all" onclick="saveAll()" id="btnSave">💾 Save All Changes</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="page-header">
+      <h1>SOP Editor</h1>
+      <p>Manage company overview and role-specific SOPs.</p>
+    </div>
+
+    <!-- COMPANY OVERVIEW -->
+    <div class="editor-section active" id="sec-company">
+      <div class="section-heading">Company Overview</div>
+      <div class="section-sub">Edit general company information visible to all employees.</div>
+      <div class="field"><label>Company Name</label><input id="c-name" type="text"></div>
+      <div class="field"><label>Tagline</label><input id="c-tagline" type="text"></div>
+      <div class="field"><label>Last Updated</label><input id="c-lastUpdated" type="text"></div>
+      <p style="font-size:13px; color:var(--muted); margin-top:40px;">More Company Overview sections (values, mission, etc.) coming soon...</p>
+    </div>
+
+    <!-- ROLES & SOPs -->
+    <div class="editor-section" id="sec-roles">
+      <div class="section-heading">Roles & SOPs</div>
+      <div class="section-sub">Create and edit role-specific SOP content.</div>
+      
+      <div class="field">
+        <label>Select Role to Edit</label>
+        <select id="roleSelect" onchange="loadRole()">
+          <option value="">-- Select a role --</option>
+          <option value="CEO">CEO</option>
+          <option value="COO">COO</option>
+          <option value="CFO">CFO</option>
+          <option value="Operations Manager">Operations Manager</option>
+          <option value="CS Manager">CS Manager</option>
+          <option value="CS">CS</option>
+          <option value="Dispute Specialist">Dispute Specialist</option>
+          <option value="Product Manager">Product Manager</option>
+          <option value="Funnel Builder">Funnel Builder</option>
+          <option value="Creative Manager">Creative Manager</option>
+          <option value="Video Editor">Video Editor</option>
+          <option value="FB Ads Manager">FB Ads Manager</option>
+          <option value="Media Buyer">Media Buyer</option>
+          <option value="HR">HR</option>
+          <option value="Tech / Automations">Tech / Automations</option>
+          <option value="VA">VA</option>
+        </select>
+      </div>
+
+      <div id="roleEditor" style="display:none">
+        <div class="field"><label>Role Overview</label><textarea id="role-overview" placeholder="What this role does, who they report to, success metrics..."></textarea></div>
+        
+        <div style="margin-top:32px; margin-bottom:20px;">
+          <label style="display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">Responsibilities</label>
+          <div id="responsibilities-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:12px;"></div>
+          <button onclick="addResponsibility()" style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px dashed var(--border); border-radius:8px; background:none; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--muted); cursor:pointer; transition:all 0.15s; width:100%;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--muted)'">+ Add Responsibility</button>
+        </div>
+
+        <div style="margin-top:32px; margin-bottom:20px;">
+          <label style="display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">SOPs (Step-by-Step Procedures)</label>
+          <div id="sops-list" style="display:flex; flex-direction:column; gap:12px; margin-bottom:12px;"></div>
+          <button onclick="addSOP()" style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px dashed var(--border); border-radius:8px; background:none; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--muted); cursor:pointer; transition:all 0.15s; width:100%;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--muted)'">+ Add SOP</button>
+        </div>
+
+        <div style="margin-top:32px; margin-bottom:20px;">
+          <label style="display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">KPIs (Key Performance Indicators)</label>
+          <div id="kpis-list" style="display:flex; flex-direction:column; gap:12px; margin-bottom:12px;"></div>
+          <button onclick="addKPI()" style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px dashed var(--border); border-radius:8px; background:none; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--muted); cursor:pointer; transition:all 0.15s; width:100%;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--muted)'">+ Add KPI</button>
+        </div>
+
+        <div style="margin-top:32px; margin-bottom:20px;">
+          <label style="display:block; font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">Tools</label>
+          <div id="tools-list" style="display:flex; flex-direction:column; gap:12px; margin-bottom:12px;"></div>
+          <button onclick="addTool()" style="display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px dashed var(--border); border-radius:8px; background:none; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--muted); cursor:pointer; transition:all 0.15s; width:100%;" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--muted)'">+ Add Tool</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERMISSIONS -->
+    <div class="editor-section" id="sec-permissions">
+      <div class="section-heading">Manual Permissions</div>
+      <div class="section-sub">Override automatic role-based permissions. Give specific people access to edit specific sections.</div>
+      
+      <div class="field">
+        <label>User Email</label>
+        <input id="perm-email" type="email" placeholder="employee@company.com">
+      </div>
+
+      <div class="field">
+        <label>Grant Access To</label>
+        <select id="perm-role">
+          <option value="">-- Select role/section --</option>
+          <option value="CEO">CEO</option>
+          <option value="COO">COO</option>
+          <option value="CFO">CFO</option>
+          <option value="Operations Manager">Operations Manager</option>
+          <option value="CS Manager">CS Manager</option>
+          <option value="CS">CS</option>
+          <option value="Dispute Specialist">Dispute Specialist</option>
+          <option value="Product Manager">Product Manager</option>
+          <option value="Funnel Builder">Funnel Builder</option>
+          <option value="Creative Manager">Creative Manager</option>
+          <option value="Video Editor">Video Editor</option>
+          <option value="FB Ads Manager">FB Ads Manager</option>
+          <option value="Media Buyer">Media Buyer</option>
+          <option value="HR">HR</option>
+          <option value="Tech / Automations">Tech / Automations</option>
+          <option value="VA">VA</option>
+        </select>
+      </div>
+
+      <button class="btn-save-all" style="width:auto; padding:12px 24px;" onclick="grantPermission()">+ Grant Access</button>
+
+      <div style="margin-top:40px;">
+        <h3 style="font-size:16px; margin-bottom:16px;">Current Manual Permissions</h3>
+        <div id="permissionsList" style="display:flex; flex-direction:column; gap:12px;"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast">✅ Changes saved!</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./supabase-client.js"></script>
-<script src="./app-shell.js"></script>
-<script src="./utils.js"></script>
-<script src="./admin.js"></script>
+<script>
+  const SUPABASE_URL = 'https://wkwgyoowhfhkyqwlufup.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indrd2d5b293aGZoa3lxd2x1ZnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDQwMTIsImV4cCI6MjA4NjkyMDAxMn0.ArSqtBC9K_268UnAfwTiqgYoJXGoXDmp1n9J2ISzgLE';
+
+  const { createClient } = supabase;
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentRoleData = {};
+  let companyData = { name: '[Company Name]', tagline: 'Building brands that convert.', lastUpdated: 'February 2026' };
+  let permissions = [];
+  let roleResponsibilities = [];
+  let roleSOPs = [];
+  let roleKPIs = [];
+  let roleTools = [];
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const { data: users } = await supabaseClient.from('users').select('*').eq('email', session.user.email).single();
+    const currentUser = users || { role: 'Employee' };
+
+    if (currentUser.role !== 'CEO' && currentUser.role !== 'COO') {
+      alert('Access denied. Admin panel is only for CEO/COO.');
+      window.location.href = 'company-overview.html';
+      return;
+    }
+
+    const { data: content } = await supabaseClient.from('sop_content').select('*').eq('section', 'company').single();
+    if (content && content.content) {
+      companyData = content.content;
+    }
+
+    document.getElementById('c-name').value = companyData.name;
+    document.getElementById('c-tagline').value = companyData.tagline;
+    document.getElementById('c-lastUpdated').value = companyData.lastUpdated;
+
+    await loadPermissions();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('adminUI').style.display = 'flex';
+  }
+
+  function showSection(id) {
+    document.querySelectorAll('.editor-section').forEach(s=>s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.getElementById('sec-'+id).classList.add('active');
+    event.target.classList.add('active');
+    
+    if (id === 'permissions') {
+      loadPermissions();
+    }
+  }
+
+  async function loadPermissions() {
+    const { data } = await supabaseClient.from('role_permissions').select('*').order('created_at', { ascending: false });
+    permissions = data || [];
+    renderPermissions();
+  }
+
+  function renderPermissions() {
+    const list = document.getElementById('permissionsList');
+    if (permissions.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted); font-size:14px;">No manual permissions set yet.</p>';
+      return;
+    }
+
+    list.innerHTML = permissions.map((p, i) => `
+      <div style="background:var(--white); border:1px solid var(--border); border-radius:8px; padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${p.user_email}</div>
+          <div style="font-size:13px; color:var(--muted);">Can ${p.can_edit ? 'edit' : 'view'}: ${p.role}</div>
+        </div>
+        <button onclick="revokePermission(${i})" style="background:#fee2e2; color:#dc2626; border:none; padding:8px 16px; border-radius:6px; font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif;">Revoke</button>
+      </div>
+    `).join('');
+  }
+
+  async function grantPermission() {
+    const email = document.getElementById('perm-email').value.trim();
+    const role = document.getElementById('perm-role').value;
+
+    if (!email || !role) {
+      alert('Please fill in both email and role');
+      return;
+    }
+
+    await supabaseClient.from('role_permissions').insert({
+      user_email: email,
+      role: role,
+      can_edit: true,
+      created_at: new Date().toISOString()
+    });
+
+    document.getElementById('perm-email').value = '';
+    document.getElementById('perm-role').value = '';
+
+    await loadPermissions();
+    
+    const toast = document.getElementById('toast');
+    toast.textContent = '✅ Permission granted!';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  async function revokePermission(index) {
+    const perm = permissions[index];
+    await supabaseClient.from('role_permissions').delete().match({ 
+      user_email: perm.user_email, 
+      role: perm.role 
+    });
+
+    await loadPermissions();
+
+    const toast = document.getElementById('toast');
+    toast.textContent = '✅ Permission revoked!';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  async function loadRole() {
+    const role = document.getElementById('roleSelect').value;
+    if (!role) {
+      document.getElementById('roleEditor').style.display = 'none';
+      return;
+    }
+
+    const { data } = await supabaseClient.from('sop_roles').select('*').eq('role', role).single();
+    
+    if (data) {
+      document.getElementById('role-overview').value = data.role_overview || '';
+      roleResponsibilities = data.responsibilities || [];
+      roleSOPs = data.sops || [];
+      roleKPIs = data.kpis || [];
+      roleTools = data.tools || [];
+    } else {
+      document.getElementById('role-overview').value = '';
+      roleResponsibilities = [];
+      roleSOPs = [];
+      roleKPIs = [];
+      roleTools = [];
+    }
+
+    renderResponsibilities();
+    renderSOPs();
+    renderKPIs();
+    renderTools();
+
+    document.getElementById('roleEditor').style.display = 'block';
+  }
+
+  function renderResponsibilities() {
+    const list = document.getElementById('responsibilities-list');
+    list.innerHTML = roleResponsibilities.map((r, i) => `
+      <div style="display:flex; gap:8px; align-items:flex-start;">
+        <textarea oninput="roleResponsibilities[${i}] = this.value" style="flex:1; padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--white); outline:none; resize:vertical; min-height:60px;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">${r}</textarea>
+        <button onclick="removeResponsibility(${i})" style="background:#fee2e2; color:#dc2626; border:none; padding:8px; border-radius:6px; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function addResponsibility() {
+    roleResponsibilities.push('');
+    renderResponsibilities();
+  }
+
+  function removeResponsibility(i) {
+    roleResponsibilities.splice(i, 1);
+    renderResponsibilities();
+  }
+
+  function renderSOPs() {
+    const list = document.getElementById('sops-list');
+    list.innerHTML = roleSOPs.map((s, i) => `
+      <div style="background:var(--white); border:1.5px solid var(--border); border-radius:10px; padding:20px; position:relative;">
+        <button onclick="removeSOP(${i})" style="position:absolute; top:12px; right:12px; background:#fee2e2; color:#dc2626; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:13px;">Remove</button>
+        <input type="text" placeholder="SOP Title" value="${s.title || ''}" oninput="roleSOPs[${i}].title = this.value" style="width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; color:var(--ink); background:var(--paper); outline:none; margin-bottom:10px;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <textarea placeholder="Step-by-step instructions..." oninput="roleSOPs[${i}].content = this.value" style="width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--white); outline:none; resize:vertical; min-height:100px;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">${s.content || ''}</textarea>
+      </div>
+    `).join('');
+  }
+
+  function addSOP() {
+    roleSOPs.push({ title: '', content: '' });
+    renderSOPs();
+  }
+
+  function removeSOP(i) {
+    roleSOPs.splice(i, 1);
+    renderSOPs();
+  }
+
+  function renderKPIs() {
+    const list = document.getElementById('kpis-list');
+    list.innerHTML = roleKPIs.map((k, i) => `
+      <div style="background:var(--white); border:1.5px solid var(--border); border-radius:10px; padding:16px 18px; position:relative; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <button onclick="removeKPI(${i})" style="position:absolute; top:12px; right:12px; background:#fee2e2; color:#dc2626; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">✕</button>
+        <input type="text" placeholder="Metric name" value="${k.metric || ''}" oninput="roleKPIs[${i}].metric = this.value" style="padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--paper); outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <input type="text" placeholder="Target" value="${k.target || ''}" oninput="roleKPIs[${i}].target = this.value" style="padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--paper); outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+    `).join('');
+  }
+
+  function addKPI() {
+    roleKPIs.push({ metric: '', target: '' });
+    renderKPIs();
+  }
+
+  function removeKPI(i) {
+    roleKPIs.splice(i, 1);
+    renderKPIs();
+  }
+
+  function renderTools() {
+    const list = document.getElementById('tools-list');
+    list.innerHTML = roleTools.map((t, i) => `
+      <div style="background:var(--white); border:1.5px solid var(--border); border-radius:10px; padding:16px 18px; position:relative; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <button onclick="removeTool(${i})" style="position:absolute; top:12px; right:12px; background:#fee2e2; color:#dc2626; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;">✕</button>
+        <input type="text" placeholder="Tool name" value="${t.name || ''}" oninput="roleTools[${i}].name = this.value" style="padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--paper); outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <input type="text" placeholder="Purpose" value="${t.purpose || ''}" oninput="roleTools[${i}].purpose = this.value" style="padding:10px 12px; border:1.5px solid var(--border); border-radius:7px; font-family:'DM Sans',sans-serif; font-size:13.5px; color:var(--ink); background:var(--paper); outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+    `).join('');
+  }
+
+  function addTool() {
+    roleTools.push({ name: '', purpose: '' });
+    renderTools();
+  }
+
+  function removeTool(i) {
+    roleTools.splice(i, 1);
+    renderTools();
+  }
+
+  async function saveAll() {
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    // Save company data
+    companyData.name = document.getElementById('c-name').value;
+    companyData.tagline = document.getElementById('c-tagline').value;
+    companyData.lastUpdated = document.getElementById('c-lastUpdated').value;
+
+    await supabaseClient.from('sop_content').upsert({
+      section: 'company',
+      content: companyData,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'section' });
+
+    // Save role data if editing
+    const role = document.getElementById('roleSelect').value;
+    if (role && document.getElementById('roleEditor').style.display !== 'none') {
+      await supabaseClient.from('sop_roles').upsert({
+        role,
+        role_overview: document.getElementById('role-overview').value,
+        responsibilities: roleResponsibilities.filter(r => r.trim()),
+        sops: roleSOPs.filter(s => s.title || s.content),
+        kpis: roleKPIs.filter(k => k.metric || k.target),
+        tools: roleTools.filter(t => t.name || t.purpose),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'role' });
+    }
+
+    btn.disabled = false;
+    btn.textContent = '💾 Save All Changes';
+
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  init();
+</script>
 </body>
 </html>
